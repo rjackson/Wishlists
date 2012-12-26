@@ -1,0 +1,79 @@
+$def with (userWidget, threadid)
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="/css/style.css"/>
+        <script>
+
+        function sleep(ms)
+        {
+            var dt = new Date();
+            dt.setTime(dt.getTime() + ms);
+            while (new Date().getTime() < dt.getTime());
+        }
+
+        var xhr = new XMLHttpRequest();
+        function pollServerForWishlistProgress()
+        {
+            xhr.open("POST", document.URL, true);
+            xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+            xhr.onreadystatechange = handleWishlistUpdateResonse
+            xhr.send($threadid);
+        }
+
+        function handleWishlistUpdateResonse() {
+                if ( xhr.readyState == 4 )
+                {
+                    if( xhr.status == 200 )
+                    {
+                        response = JSON.parse(xhr.responseText);
+                        if (response["success"] == false)
+                        {
+                            if (!response["error"]) {
+                               document.getElementById("progress").innerHTML = response["progress"] + "%<br/>" + response["doneCount"] + " / " + response["count"];
+                            }
+                            //sleep(2000);
+                            pollServerForWishlistProgress();
+                        }
+                        else if (response["success"] == true)
+                        {
+                            spinner = document.getElementById("SPINBABYSPIN");
+                            spinner.parentNode.removeChild(spinner);
+                            progress = document.getElementById("progress");
+                            progress.parentNode.removeChild(progress);
+
+                            var data = response["data"]
+                            for (i in data)
+                            {
+                                document.getElementById("friendWidgets").innerHTML += data[i];
+
+                                //console.log(data[i])
+                            }
+                            document.getElementById("friendCount").innerHTML = data.length;
+                        }
+                    }
+                }
+            }
+        pollServerForWishlistProgress();
+        </script>
+    </head>
+    <body>
+        $:userWidget
+        <p><img id="header" src="img/mp-logo.png" alt="Steam Wishlists"></p>
+
+        <div id="friendWidgets">
+            <img id="SPINBABYSPIN" alt="Like a record player." src="img/spinner.gif"/>
+            <p id="progress"></p>
+        </div>
+
+
+        <p>Debug info:
+            <ul>
+                <li> Friends: <span id="friendCount"></span></li>
+                <li> Have wishlists: TODO</li>
+                <li> Combined games: TODO</li>
+                <li> Distrinct games: TODO</li>
+            </ul>
+        </p>
+    </body>
+</html>

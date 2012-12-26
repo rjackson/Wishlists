@@ -1,0 +1,11 @@
+$def with (userInfo)
+
+<div id="userWidget">
+    <img src=$userInfo["avatar"] alt=$userInfo["personaname"]>
+    <h2 style="display:inline">
+        <a href=$userInfo["profileurl"]
+           alt=$userInfo["personaname"]>
+            $userInfo["personaname"]
+        </a>
+    </h2>
+</div>
