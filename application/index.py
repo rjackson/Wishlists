@@ -9,6 +9,8 @@ import time
 import webbrowser
 import json
 import Queue
+import uwsgi
+
 #web.config.debug = False
 
 path = os.path.abspath(__file__)
@@ -22,6 +24,7 @@ urls = (
         "/", 'index')
 render = web.template.render(path + '/templates/')
 api_key = ""
+THREAD_COUNT = 100
 
 app = web.application(urls, globals())
 
@@ -115,10 +118,18 @@ class ThreadedGetWishlist(threading.Thread):
             friendInfo[id]["progress"] += 1
             self.queue.task_done()
 
-for i in range(10):
-    t = ThreadedGetWishlist(queue)
-    t.setDaemon(True)
-    t.start()
+def spawnWorkers():
+    for i in range(THREAD_COUNT):
+        t = ThreadedGetWishlist(queue)
+        t.setDaemon(True)
+        t.start()
+
+# To test with the Webpy's inbuilt httpserver uncomment this line:
+# spawnWorkers()
+
+# and comment out this line, and the "import uwsgi" line above:
+uwsgi.post_fork_hook = spawnWorkers
+
 
 def GetAccountInfo(account, id):
     id = str(id)
@@ -152,7 +163,9 @@ def GetAccountInfo(account, id):
         data["id"] = id
         queue.put(data)
 
-    queue.join()
+    # While loop to check if id's data has been loaded.
+    while (len(friendInfo[id]["data"]) < friendInfo[id]["size"]):
+        pass
     friendInfo[id]["done"] = True
 
 
