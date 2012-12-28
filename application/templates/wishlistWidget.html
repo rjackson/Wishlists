@@ -8,6 +8,9 @@ $def with (userInfo)
             $userInfo["personaname"]
         </a>
     </h2>
-    <p>$userInfo["wishlist"]</p>
+    <ul>
+        $for item in userInfo["wishlist"]:
+        <li>$:item</li>
+    </ul>
     </br>
 </div>
