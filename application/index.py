@@ -107,23 +107,20 @@ def GetWishlist(id64):
     return wishlist
 
 
-gameInfo = json.loads(open(path + os.sep + appListFile, "r").read())
-gameInfo["lastOpened"] = time.mktime(time.gmtime())
-gameInfoTimeout = 60 * 60
-
-
-def GetGameInfo(appid):
-    global gameInfo, gameInfoTimeout
-    if (gameInfo["lastOpened"] < (time.time() - gameInfoTimeout)):
-        gameInfo = json.loads(open(path + os.sep + appListFile, "r").read())
-        gameInfo["lastOpened"] = time.mktime(time.gmtime)
-        gameInfoTimeout = 60 * 60
+gameDefinitions = {"data": json.loads(open(path + os.sep + appListFile, "r").read()),
+            "lastOpened": time.mktime(time.gmtime()),
+            "timeout": 60 * 60}
+def GetGameDefinition(appid):
+    global gameDefinitions
+    if (gameDefinitions["lastOpened"] < (time.time() - gameDefinitions["timeout"])):
+        gameDefinitions["data"] = json.loads(open(path + os.sep + appListFile, "r").read())
+        gameDefinitions["lastOpened"] = time.mktime(time.gmtime())
 
     appid = str(appid)
-    if gameInfo.get(appid, None) == None:
+    if gameDefinitions["data"].get(appid, None) == None:
         return {"name": "Definition not found ({})".format(appid), "url": "http://store.steampowered.com/app/{}".format(appid)}
     else:
-        return gameInfo[appid]
+        return gameDefinitions["data"][appid]
 
 
 friendInfo = {}
@@ -139,7 +136,7 @@ class ThreadedGetWishlist(threading.Thread):
 
             for i in range(len(data["wishlist"])):
                 item = data["wishlist"][i]
-                data["wishlist"][i] = str(render.gameTile(GetGameInfo(item)))
+                data["wishlist"][i] = str(render.gameTile(GetGameDefinition(item)))
 
             id = data["id"]
             friendInfo[id]["data"].append(str(render.wishlistWidget(data)))
