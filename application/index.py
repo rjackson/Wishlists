@@ -4,12 +4,14 @@ import os
 import re
 import urllib2
 import web
-import threading
 import time
 import webbrowser
 import json
 import Queue
-import uwsgi
+# import uwsgi
+import gevent
+from gevent import monkey; monkey.patch_all()
+# from gevent.pywsgi import WSGIServer
 
 #web.config.debug = False
 
@@ -25,8 +27,6 @@ urls = (
         "/", 'index')
 render = web.template.render(path + '/templates/')
 API_KEY = ""
-THREAD_COUNT = 10
-PER_USER_THREAD_COUNT = 100
 appListFile = "SteamAppList.json"
 
 app = web.application(urls, globals())
@@ -124,92 +124,49 @@ def GetGameDefinition(appid):
 
 
 friendInfo = {}
-class ThreadedGetWishlist(threading.Thread):
-    def __init__(self, queue):
-        threading.Thread.__init__(self)
-        self.queue = queue
-
-    def run(self):
-        while True:
-            data = self.queue.get()
-            data["wishlist"] = GetWishlist(data["steamid"])
-
-            for i in range(len(data["wishlist"])):
-                item = data["wishlist"][i]
-                data["wishlist"][i] = str(render.gameTile(GetGameDefinition(item)))
-
-            id = data["id"]
-            friendInfo[id]["data"].append(str(render.wishlistWidget(data)))
-            friendInfo[id]["progress"] += 1
-            self.queue.task_done()
 
 
-getAccountQueue = Queue.Queue()
-class ThreadedGetAccountInfo(threading.Thread):
-    def __init__(self, queue):
-        threading.Thread.__init__(self)
-        self.queue = queue
+def getWishlistsFromFriend(id, friend):
+        friend["wishlist"] = GetWishlist(friend["steamid"])
 
-    def run(self):
-        while True:
-            data = self.queue.get()
-            id = str(data["id"])
-            friends = w.GetFriendList(data["account"])
-            if (friendInfo.get(id, None) == None):
-                friendInfo[id] = {}
-            friendInfo[id]["progress"] = 0.0
-            friendInfo[id]["done"] = False
-            friendInfo[id]["size"] = len(friends)
-            friendInfo[id]["data"] = []
+        for i in range(len(friend["wishlist"])):
+            item = friend["wishlist"][i]
+            friend["wishlist"][i] = str(render.gameTile(GetGameDefinition(item)))
 
-            dataOnFriends = []
-            if len(friends) <= 100:
-                dataOnFriends.extend(w.GetPlayerSummaries([x["steamid"] for x in friends]))
-            else:
-                steamidList = [x["steamid"] for x in friends]
-                friendCount = len(friends)
-                requiredIterations = math.ceil(float(friendCount) / 100)
-                print requiredIterations
-                i = 0
-                while i < requiredIterations:
-                    min = i * 100
-                    max = min + 100
-                    if len(steamidList[min:]) < max:
-                        max = min + len(steamidList[min:])
-                    trimmedList = steamidList[min:max]
-                    dataOnFriends.extend(w.GetPlayerSummaries(trimmedList))
-                    i += 1
+        friendInfo[id]["data"].append(str(render.wishlistWidget(friend)))
+        friendInfo[id]["progress"] += 1
 
-            getWishlistQueue = Queue.Queue()
-            if len(dataOnFriends) < PER_USER_THREAD_COUNT:
-                workersNeeded = len(dataOnFriends)
-            else:
-                workersNeeded = PER_USER_THREAD_COUNT
+def getAccountInfo(id, account):
+    friends = w.GetFriendList(account)
+    if (friendInfo.get(id, None) == None):
+        friendInfo[id] = {}
+    friendInfo[id]["progress"] = 0.0
+    friendInfo[id]["done"] = False
+    friendInfo[id]["size"] = len(friends)
+    friendInfo[id]["data"] = []
 
-            for i in range(workersNeeded):
-                t = ThreadedGetWishlist(getWishlistQueue)
-                t.setDaemon(True)
-                t.start()
+    dataOnFriends = []
+    if len(friends) <= 100:
+        dataOnFriends.extend(w.GetPlayerSummaries([x["steamid"] for x in friends]))
+    else:
+        steamidList = [x["steamid"] for x in friends]
+        friendCount = len(friends)
+        requiredIterations = math.ceil(float(friendCount) / 100)
+        print requiredIterations
+        i = 0
+        while i < requiredIterations:
+            min = i * 100
+            max = min + 100
+            if len(steamidList[min:]) < max:
+                max = min + len(steamidList[min:])
+            trimmedList = steamidList[min:max]
+            dataOnFriends.extend(w.GetPlayerSummaries(trimmedList))
+            i += 1
 
-            for data in dataOnFriends:
-                data["id"] = id
-                getWishlistQueue.put(data)
+    friendsWishlists = [gevent.spawn(getWishlistsFromFriend, id, friend) for friend in dataOnFriends]
+    gevent.joinall(friendsWishlists)
 
-            getWishlistQueue.join()
-            friendInfo[id]["done"] = True
-
-
-def spawnAccountInfoWorkers():
-    for i in range(THREAD_COUNT):
-        t = ThreadedGetAccountInfo(getAccountQueue)
-        t.setDaemon(True)
-        t.start()
-
-# To test with the Webpy's inbuilt httpserver uncomment this line:
-# spawnAccountInfoWorkers()
-
-# and comment out this line, and the "import uwsgi" line above:
-uwsgi.post_fork_hook = spawnAccountInfoWorkers
+    friendInfo[id]["done"] = True
 
 
 class index:
@@ -227,8 +184,9 @@ class wishlist:
         accountInfo = w.GetPlayerSummaries(account)[0]
         userWidget = render.userWidget(accountInfo)
         threadid = str(int(time.mktime(time.gmtime())))
-        args = {"account": account, "id": threadid}
-        getAccountQueue.put(args)
+
+        gevent.spawn(getAccountInfo, threadid, account)
+
         return render.wishlist(userWidget, threadid)
 
     def POST(self):
