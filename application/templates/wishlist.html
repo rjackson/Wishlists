@@ -1,72 +1,69 @@
-$def with (userWidget, threadid)
+$def with (account)
 <!DOCTYPE html>
 <html>
     <head>
         <link rel="stylesheet" type="text/css" href="/css/style.css"/>
         <script type="text/javascript" src="/js/jquery-1.8.3.js"></script>
         <script>
-
-        function sleep(ms)
-        {
-            var dt = new Date();
-            dt.setTime(dt.getTime() + ms);
-            while (new Date().getTime() < dt.getTime());
-        }
-
-        function pollServerForWishlistInfo() {
+        var userAccount = false;
+        var userFriends = false;
+        function getLocalAccount() {
             \$.ajax({
-                url: document.URL,
-                type: "POST",
-                data: {id: "$threadid"}
-            }).done(handleWishlistUpdateResonse);
-        }
-
-        function handleWishlistUpdateResonse(response) {
-            console.log(response);
-            response = JSON.parse(response);
-            if (response["success"] == false)
-            {
-                if (!response["error"]) {
-                   document.getElementById("progress").innerHTML = response["progress"] + "%<br/>" + response["doneCount"] + " / " + response["count"];
+                url: "/api/Accounts/GetAccount",
+                data: "accounts=$account.id64",
+                type: "post"
+            }).done(function(response) {
+                console.log("Got response")
+                if (response["accounts"] != null) {
+                    console.log(response["accounts"])
+                    userAccount = response["accounts"]["$account.id64"];
+                    getAccountFriends(userAccount)
                 }
-                setTimeout(pollServerForWishlistInfo, 1000);
-            }
-            else if (response["success"] == true)
-            {
-                spinner = document.getElementById("SPINBABYSPIN");
-                spinner.parentNode.removeChild(spinner);
-                progress = document.getElementById("progress");
-                progress.parentNode.removeChild(progress);
-
-                var data = response["data"]
-                for (i in data)
-                {
-                    document.getElementById("friendWidgets").innerHTML += data[i];
-
-                    //console.log(data[i])
+                else {
+                    getLocalAccount();
                 }
-                document.getElementById("friendCount").innerHTML = data.length;
-            }
+            });
         }
-        pollServerForWishlistInfo()
+        getLocalAccount()
+
+        function getAccountFriends(account) {
+            \$.ajax({
+               url: "/api/Accounts/GetAccount",
+               data: "accounts=" + account["friends"].join(","),
+               type: "post"
+           }).done(function(response) {
+               if (response["accounts"]) {
+                   userFriends = response["accounts"];
+               }
+               else {
+                   getAccountFriends(account);
+               }
+           });
+        }
         </script>
     </head>
     <body>
-        $:userWidget
         <p><img id="header" src="img/mp-logo.png" alt="Steam Wishlists"></p>
-
-        <div id="friendWidgets">
-            <img id="SPINBABYSPIN" alt="Like a record player." src="img/spinner.gif"/>
-            <p id="progress"></p>
+        <div id="UserWidget">
+            <img style="width:64px;"
+                src="$account.avatarUrl"
+                alt="$account.name"/>
+            <h1>$account.name</h1></div>
+        <div id="wishlistWidgets">
         </div>
 
 
         <p>Debug info:
             <ul>
-                <li> Friends: <span id="friendCount"></span></li>
-                <li> Have wishlists: TODO</li>
-                <li> Combined games: TODO</li>
-                <li> Distrinct games: TODO</li>
+                <li> Friends: <span id="friendCount"></span>
+                    <ul>
+                        <li>Visible: <span id="visibleCount"></span></li>
+                        <li>Private: <span id="privateCount"></span></li>
+                        <li>Have wishlists: <span id="haveWishlistCount"></span></li>
+                    </ul>
+                </li>
+                <li> Total wishlist count: TODO</li>
+                <li> Distinct games count: TODO</li>
             </ul>
         </p>
     </body>

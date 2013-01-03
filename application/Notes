@@ -1,0 +1,3 @@
+- Need to AJAXify, and then extend to full functionality (all friends list)
+- Decode special chars from app names, e.g. &reg, &trade
+- Daemonize wishlist.py

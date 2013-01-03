@@ -1,6 +1,6 @@
-$def with (account, wishlistItems)
+$def with (account)
 
-<div id="userWidget">
+<div id="accountWidget">
     <img style="width:32px;height:32px;"
          src="$account.avatarUrl"
          alt="$account.name"/>
@@ -11,11 +11,4 @@ $def with (account, wishlistItems)
         </a>
     </h2>
     <p><small>Last updated: $account.lastUpdated</small></p>
-    <ul>
-        $for item in wishlistItems:
-        <li>$:item</li>
-    </ul>
-    </br>
-    </br>
 </div>
-<hr/>
